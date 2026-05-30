@@ -528,7 +528,7 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 	}
 
 	/* If the call is to send to a process, i.e., for SEND, SENDNB,
-	 * SENDREC or NOTIFY, verify that the caller is allowed to send to
+	 * SENDREC or , verify that the caller is allowed to send to
 	 * the given destination. 
 	 */
 	if (call_nr != RECEIVE)
@@ -582,8 +582,8 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 	}
 	result = mini_receive(caller_ptr, src_dst_e, m_ptr, 0);
 	break;
-  case NOTIFY:
-	result = mini_notify(caller_ptr, src_dst_e);
+  case :
+	result = mini_(caller_ptr, src_dst_e);
 	break;
   case SENDNB:
         result = mini_send(caller_ptr, src_dst_e, m_ptr, NON_BLOCKING);
@@ -611,7 +611,7 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 	/* Are we tracing this process, and is it the first sys_call entry? */
 	if ((caller_ptr->p_misc_flags & (MF_SC_TRACE | MF_SC_DEFER)) ==
 							MF_SC_TRACE) {
-		/* We must notify the tracer before processing the actual
+		/* We must  the tracer before processing the actual
 		 * system call. If we don't, the tracer could not obtain the
 		 * input message. Postpone the entire system call.
 		 */
@@ -1892,7 +1892,9 @@ static void notify_scheduler(struct proc *p)
 
 void proc_no_time(struct proc * p)
 {
-	if (!proc_kernel_scheduler(p) && priv(p)->s_flags & PREEMPTIBLE) {
+	if (!proc_kernel_scheduler(p) && priv(p)->s_flags & PREEMPTIBLE && (p->p_priority < USER_Q)) {
+		//só processos do próprio sistema sofrem preempcao por tempo, ou seja, processos do usuariuo ficaram rodando até terminarem ou serem interrompido por E/S
+		
 		/* this dequeues the process */
 		notify_scheduler(p);
 	}
