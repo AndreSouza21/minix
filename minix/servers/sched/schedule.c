@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <minix/com.h>
 #include <machine/archtypes.h>
+#include <stdlib.h>
 
 static unsigned balance_timeout;
 
