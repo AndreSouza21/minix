@@ -269,11 +269,8 @@ int do_nice(message *m_ptr)
 	}
 
 	rmp = &schedproc[proc_nr_n];
-	new_q = m_ptr->m_pm_sched_scheduling_set_nice.maxprio;
-	if (new_q >= NR_SCHED_QUEUES) {
-		return EINVAL;
-	}
-
+	new_q = USER_Q;
+	
 	/* Store old values, in case we need to roll back the changes */
 	old_q     = rmp->priority;
 	old_max_q = rmp->max_priority;
@@ -352,18 +349,9 @@ void init_scheduling(void)
  */
 void balance_queues(void)
 {
-	struct schedproc *rmp;
-	int r, proc_nr;
+	return;
 
-	for (proc_nr=0, rmp=schedproc; proc_nr < NR_PROCS; proc_nr++, rmp++) {
-		if (rmp->flags & IN_USE) {
-			if (rmp->priority > rmp->max_priority) {
-				rmp->priority -= 1; /* increase priority */
-				schedule_process_local(rmp);
-			}
-		}
-	}
-
-	if ((r = sys_setalarm(balance_timeout, 0)) != OK)
-		panic("sys_setalarm failed: %d", r);
+	/* Retorno no inicio da funcao para impedir a mudanca de filas entre os 
+	 * processos, fazendo assim eles operarem todas na mesma fila de origem.
+	*/
 }
