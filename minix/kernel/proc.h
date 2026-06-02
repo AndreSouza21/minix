@@ -26,6 +26,7 @@ struct proc {
   struct priv *p_priv;		/* system privileges structure */
   volatile u32_t p_rts_flags;	/* process is runnable only if zero */
   volatile u32_t p_misc_flags;	/* flags that do not suspend the process */
+  unsigned int p_tickets;   // Numero de bilhetes do processo 
 
   char p_priority;		/* current process priority */
   u64_t p_cpu_time_left;	/* time left to use the cpu */
