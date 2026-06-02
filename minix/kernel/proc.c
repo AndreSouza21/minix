@@ -1606,6 +1606,14 @@ void enqueue(
  */
   int q = rp->p_priority;	 		/* scheduling queue to use */
   struct proc **rdy_head, **rdy_tail;
+	
+	//define tickets para processos de usuario
+	if (q < USER_Q) {
+	    rp->p_tickets = 0;
+	} else {
+	    rp->p_tickets = 10;
+	}
+	
   
   assert(proc_is_runnable(rp));
 
@@ -1793,11 +1801,39 @@ static struct proc * pick_proc(void)
   register struct proc *rp;			/* process to run */
   struct proc **rdy_head;
   int q;				/* iterate over queues */
+  unsigned int total_tickets = 0;
+  unsigned int winning_ticket, accumulated = 0;
+  struct proc *winner = NULL;
+  int p_nr;
+	
+  // Sorteia entre processos de usuario prontos 
 
-  /* Check each of the scheduling queues for ready processes. The number of
-   * queues is defined in proc.h, and priorities are set in the task table.
-   * If there are no processes ready to run, return NULL.
-   */
+  for (p_nr = -NR_TASKS; p_nr < NR_PROCS; p_nr++) {
+      rp = proc_addr(p_nr);
+      if (!isemptyp(rp) && proc_is_runnable(rp))
+          total_tickets += rp->p_tickets;
+  }
+
+  if (total_tickets > 0) {
+      winning_ticket = get_monotonic() % total_tickets;
+      for (p_nr = -NR_TASKS; p_nr < NR_PROCS; p_nr++) {
+          rp = proc_addr(p_nr);
+          if (!isemptyp(rp) && proc_is_runnable(rp)) {
+              accumulated += rp->p_tickets;
+              if (accumulated > winning_ticket) {
+                  winner = rp;
+                  break;
+              }
+          }
+      }
+      if (winner) {
+          if (priv(winner)->s_flags & BILLABLE)
+              get_cpulocal_var(bill_ptr) = winner;
+          return winner;
+      }
+  }
+
+  // Comportamento original para processos do sistema 
   rdy_head = get_cpulocal_var(run_q_head);
   for (q=0; q < NR_SCHED_QUEUES; q++) {	
 	if(!(rp = rdy_head[q])) {
