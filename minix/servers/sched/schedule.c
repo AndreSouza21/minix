@@ -353,6 +353,9 @@ void init_scheduling(void)
  */
 void balance_queues(void)
 {
+	if ((r = sys_setalarm(balance_timeout, 0)) != OK)
+		panic("sys_setalarm failed: %d", r);
+	
 	return; 
 	// Impedir que o sistema aumente a prioridade de um processo
 	/*
@@ -367,8 +370,5 @@ void balance_queues(void)
 			}
 		}
 	}
-
-	if ((r = sys_setalarm(balance_timeout, 0)) != OK)
-		panic("sys_setalarm failed: %d", r);
 	*/ 
 }
