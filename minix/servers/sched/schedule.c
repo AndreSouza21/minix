@@ -353,6 +353,7 @@ void init_scheduling(void)
  */
 void balance_queues(void)
 {
+	int r;
 	if ((r = sys_setalarm(balance_timeout, 0)) != OK)
 		panic("sys_setalarm failed: %d", r);
 	
@@ -360,7 +361,7 @@ void balance_queues(void)
 	// Impedir que o sistema aumente a prioridade de um processo
 	/*
 	struct schedproc *rmp;
-	int r, proc_nr;
+	 proc_nr;
 
 	for (proc_nr=0, rmp=schedproc; proc_nr < NR_PROCS; proc_nr++, rmp++) {
 		if (rmp->flags & IN_USE) {
