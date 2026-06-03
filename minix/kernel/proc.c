@@ -33,6 +33,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "vm.h"
 #include "clock.h"
@@ -126,6 +127,7 @@ void proc_init(void)
 	 * mappings for proc_addr() and proc_nr() macros. Do the same for the
 	 * table with privilege structures for the system processes. 
 	 */
+
 	for (rp = BEG_PROC_ADDR, i = -NR_TASKS; rp < END_PROC_ADDR; ++rp, ++i) {
 		rp->p_rts_flags = RTS_SLOT_FREE;/* initialize free slot */
 		rp->p_magic = PMAGIC;
@@ -156,6 +158,8 @@ void proc_init(void)
 		ip->p_rts_flags |= RTS_PROC_STOP;
 		set_idle_name(ip->p_name, i);
 	}
+
+	srandom(get_monotonic());
 }
 
 static void switch_address_space_idle(void)
@@ -1804,48 +1808,58 @@ static struct proc * pick_proc(void)
   unsigned int total_tickets = 0;
   unsigned int winning_ticket, accumulated = 0;
   struct proc *winner = NULL;
-  int p_nr;
 	
+  // processos do sistema tem prioridade e roda da forma padrão do sistema
+  rdy_head = get_cpulocal_var(run_q_head);
+  for (q = 0; q < USER_Q; q++) {
+    if ((rp = rdy_head[q]) != NULL) {
+        assert(proc_is_runnable(rp));
+
+        if (priv(rp)->s_flags & BILLABLE)
+            get_cpulocal_var(bill_ptr) = rp;
+
+        return rp;
+    }
+  }
+
   // Sorteia entre processos de usuario prontos 
 
-  for (p_nr = -NR_TASKS; p_nr < NR_PROCS; p_nr++) {
-      rp = proc_addr(p_nr);
-      if (!isemptyp(rp) && proc_is_runnable(rp))
-          total_tickets += rp->p_tickets;
+  for (q = USER_Q; q < NR_SCHED_QUEUES; q++) {
+    for (rp = rdy_head[q]; rp != NULL; rp = rp->p_nextready) {
+        total_tickets += rp->p_tickets;
+    }
   }
+
+  // Procura o processo sorteado
 
   if (total_tickets > 0) {
-      winning_ticket = get_monotonic() % total_tickets;
-      for (p_nr = -NR_TASKS; p_nr < NR_PROCS; p_nr++) {
-          rp = proc_addr(p_nr);
-          if (!isemptyp(rp) && proc_is_runnable(rp)) {
-              accumulated += rp->p_tickets;
-              if (accumulated > winning_ticket) {
-                  winner = rp;
-                  break;
-              }
-          }
-      }
-      if (winner) {
-          if (priv(winner)->s_flags & BILLABLE)
-              get_cpulocal_var(bill_ptr) = winner;
-          return winner;
-      }
+    winning_ticket = random() % total_tickets;
+
+    for (q = USER_Q; q < NR_SCHED_QUEUES; q++) {
+        for (rp = rdy_head[q]; rp != NULL; rp = rp->p_nextready) {
+
+            accumulated += rp->p_tickets;
+
+            if (accumulated > winning_ticket) {
+                winner = rp;
+                break;
+            }
+        }
+
+        if (winner)
+            break;
+    }
+
+    if (winner) {
+        if (priv(winner)->s_flags & BILLABLE)
+            get_cpulocal_var(bill_ptr) = winner;
+
+        return winner;
+    }
   }
 
-  // Comportamento original para processos do sistema 
-  rdy_head = get_cpulocal_var(run_q_head);
-  for (q=0; q < NR_SCHED_QUEUES; q++) {	
-	if(!(rp = rdy_head[q])) {
-		TRACE(VF_PICKPROC, printf("cpu %d queue %d empty\n", cpuid, q););
-		continue;
-	}
-	assert(proc_is_runnable(rp));
-	if (priv(rp)->s_flags & BILLABLE)	 	
-		get_cpulocal_var(bill_ptr) = rp; /* bill for system time */
-	return rp;
-  }
   return NULL;
+  
 }
 
 /*===========================================================================*
