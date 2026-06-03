@@ -33,7 +33,6 @@
 #include <signal.h>
 #include <assert.h>
 #include <string.h>
-#include <stdlib.h>
 
 #include "vm.h"
 #include "clock.h"
@@ -117,6 +116,12 @@ static void set_idle_name(char * name, int n)
 
 static message m_notify_buff = { 0, NOTIFY_MESSAGE };
 
+static unsigned long lottery_seed = 1;
+static unsigned int lottery_rand(void) {
+    lottery_seed = lottery_seed * 1103515245 + 12345;
+    return (unsigned int)(lottery_seed >> 16) & 0x7fff;
+}
+
 void proc_init(void)
 {
 	struct proc * rp;
@@ -136,6 +141,7 @@ void proc_init(void)
 		rp->p_scheduler = NULL;		/* no user space scheduler */
 		rp->p_priority = 0;		/* no priority */
 		rp->p_quantum_size_ms = 0;	/* no quantum size */
+		rp->p_tickets = 0;  // no tickets
 
 		/* arch-specific initialization */
 		arch_proc_reset(rp);
@@ -159,7 +165,7 @@ void proc_init(void)
 		set_idle_name(ip->p_name, i);
 	}
 
-	srandom(get_monotonic());
+	lottery_seed = get_monotonic();
 }
 
 static void switch_address_space_idle(void)
@@ -1833,7 +1839,7 @@ static struct proc * pick_proc(void)
   // Procura o processo sorteado
 
   if (total_tickets > 0) {
-    winning_ticket = random() % total_tickets;
+    winning_ticket = lottery_rand() % total_tickets;
 
     for (q = USER_Q; q < NR_SCHED_QUEUES; q++) {
         for (rp = rdy_head[q]; rp != NULL; rp = rp->p_nextready) {
@@ -1859,7 +1865,7 @@ static struct proc * pick_proc(void)
   }
 
   return NULL;
-  
+
 }
 
 /*===========================================================================*
