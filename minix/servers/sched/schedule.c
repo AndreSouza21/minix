@@ -12,7 +12,6 @@
 #include <assert.h>
 #include <minix/com.h>
 #include <machine/archtypes.h>
-#include <stdlib.h>
 
 static unsigned balance_timeout;
 
@@ -88,10 +87,7 @@ static void pick_cpu(struct schedproc * proc)
 int do_noquantum(message *m_ptr)
 {
 	register struct schedproc *rmp;
-	int rv, proc_nr_n, proc_nr;
-	unsigned total_tickets = 0;
-    unsigned winning_ticket;
-    unsigned accumulated = 0;
+	int rv, proc_nr_n;
 
 	if (sched_isokendpt(m_ptr->m_source, &proc_nr_n) != OK) {
 		printf("SCHED: WARNING: got an invalid endpoint in OOQ msg %u.\n",
@@ -99,38 +95,12 @@ int do_noquantum(message *m_ptr)
 		return EBADEPT;
 	}
 
-	// Soma todos os tickets de processos ativos
-	for (proc_nr = 0; proc_nr < NR_PROCS; proc_nr++) {
-    	if (schedproc[proc_nr].flags & IN_USE)
-        	total_tickets += schedproc[proc_nr].tickets;
-    }
-
-	// Sorteia um ticket
-	if (total_tickets > 0)
-        winning_ticket = (unsigned)random() % total_tickets;
-    else
-        winning_ticket = 0;
-
-	//  Encontra o processo vencedor e ajusta prioridades 
-    for (proc_nr = 0; proc_nr < NR_PROCS; proc_nr++) {
-        rmp = &schedproc[proc_nr];
-        if (!(rmp->flags & IN_USE)) continue;
-
-        accumulated += rmp->tickets;
-        if (accumulated > winning_ticket && rmp->max_priority >= USER_Q) {
-            // Processo vencedor ganha prioridade maxima 
-            rmp->priority = USER_Q;
-            schedule_process_local(rmp);
-            break;
-        }
-    }
-	
-	// Rebaixa o processo atual para MIN_USER_Q para dar espaço ao processo sorteado 
 	rmp = &schedproc[proc_nr_n];
-	if (rmp->priority < MIN_USER_Q && rmp->max_priority >= USER_Q) {
-		 rmp->priority = MIN_USER_Q;
+	/*
+	if (rmp->priority < MIN_USER_Q) {
+		rmp->priority += 1; //lower priority 
 	}
-
+	*/
 	if ((rv = schedule_process_local(rmp)) != OK) {
 		return rv;
 	}
@@ -225,10 +195,6 @@ int do_start_scheduling(message *m_ptr)
 		 * from the parent */
 		rmp->priority   = rmp->max_priority;
 		rmp->time_slice = m_ptr->m_lsys_sched_scheduling_start.quantum;
-		if (rmp->max_priority >= USER_Q)
-			rmp->tickets = 10; // Processos de usuario recebem 10 tickets para participar do sorteio
-		else
-        	rmp->tickets = 0; // Processos do sistema recebem 0 tickets e nao participam do sorteio
 		break;
 		
 	case SCHEDULING_INHERIT:
@@ -241,10 +207,6 @@ int do_start_scheduling(message *m_ptr)
 
 		rmp->priority = schedproc[parent_nr_n].priority;
 		rmp->time_slice = schedproc[parent_nr_n].time_slice;
-		if (rmp->max_priority >= USER_Q)
-			rmp->tickets = 10; // Processos de usuario recebem 10 tickets para participar do sorteio
-		else
-        	rmp->tickets = 0; // Processos do sistema recebem 0 tickets e nao participam do sorteio
 		break;
 		
 	default: 
